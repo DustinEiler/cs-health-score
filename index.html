@@ -704,7 +704,7 @@ Return this exact JSON structure:
 Score the individual signals as health indicators (100 = perfectly healthy signal, 0 = critical signal). Make the overall score a weighted composite. Be analytical and direct.`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://anthropic-proxy.dustinportland.workers.dev', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
