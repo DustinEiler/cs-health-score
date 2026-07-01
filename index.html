@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Health Score Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --black:      #2A2A2A;
+  --slate:      #5B8DB8;
+  --slate-dk:   #1A3A52;
+  --slate-lt:   #D6E8F5;
+  --bg:         #F2F4F6;
+  --surface:    #E8EDF2;
+  --surface2:   #FFFFFF;
+  --border:     #D4DAE2;
+  --text:       #2A2A2A;
+  --text-muted: #6B7280;
+  --green:      #3A7D44;
+  --green-lt:   #D6EDD9;
+  --amber:      #C07820;
+  --amber-lt:   #FDF0D5;
+  --orange:     #C05020;
+  --orange-lt:  #FDDDD5;
+  --red:        #B02020;
+  --red-lt:     #F5D5D5;
+  --font:       'Inter', sans-serif;
+  --mono:       'DM Mono', monospace;
+  --radius:     8px;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* HEADER */
+.header {
+  background: var(--black);
+  padding: 0 40px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 2px solid var(--slate);
+}
+.header-left { display: flex; align-items: center; gap: 14px; }
+.header-logo { height: 28px; width: auto; filter: brightness(0) invert(1); }
+.header-divider { width: 1px; height: 20px; background: rgba(255,255,255,0.2); }
+.header-title { color: #fff; font-size: 13px; font-weight: 500; letter-spacing: 0.02em; }
+.header-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--slate);
+  border: 1px solid var(--slate);
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* LAYOUT */
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+}
+
+.app-intro {
+  margin-bottom: 28px;
+}
+.app-intro h1 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+.app-intro p {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  max-width: 560px;
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+/* PANELS */
+.panel {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.panel-header {
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+.panel-body { padding: 20px; }
+
+/* INPUTS */
+.metric-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.metric-item {}
+.metric-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.metric-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.metric-value {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--slate);
+  min-width: 48px;
+  text-align: right;
+}
+
+/* Slider zone background glow — applied via JS on .metric-item wrapper */
+.metric-item { border-radius: 8px; padding: 10px; margin: -10px; transition: background 0.3s; }
+.zone-green { background: rgba(58, 125, 68, 0.07); }
+.zone-yellow { background: rgba(192, 120, 32, 0.08); }
+.zone-red { background: rgba(176, 32, 32, 0.07); }
+
+input[type=range] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 5px;
+  background: var(--surface);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  border: none;
+  transition: background 0.3s;
+}
+/* Zone-tinted track colours — subtle, not blinding */
+input[type=range].track-green { background: #c8e6cb; }
+input[type=range].track-yellow { background: #fde9b0; }
+input[type=range].track-red { background: #f5c6c6; }
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--slate);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  cursor: pointer;
+  transition: transform 0.1s, background 0.3s;
+}
+/* Thumb colour follows zone */
+input[type=range].track-green::-webkit-slider-thumb { background: #3A7D44; }
+input[type=range].track-yellow::-webkit-slider-thumb { background: #C07820; }
+input[type=range].track-red::-webkit-slider-thumb { background: #B02020; }
+
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+input[type=range]:focus::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--slate-lt); }
+
+/* metric-value colour follows zone */
+.metric-value.val-green { color: #3A7D44; }
+.metric-value.val-yellow { color: #C07820; }
+.metric-value.val-red { color: #B02020; }
+
+.metric-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+select:focus { border-color: var(--slate); box-shadow: 0 0 0 3px var(--slate-lt); }
+
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* ANALYZE BUTTON */
+.btn-analyze {
+  width: 100%;
+  margin-top: 24px;
+  padding: 13px;
+  background: var(--slate);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: background 0.15s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-analyze:hover { background: var(--slate-dk); }
+.btn-analyze:active { transform: scale(0.99); }
+.btn-analyze:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; }
+
+/* SPINNER */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: none;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* RESULTS PANEL */
+.results-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.results-empty-icon {
+  width: 48px; height: 48px;
+  border: 2px dashed var(--border);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+  font-size: 20px;
+}
+.results-empty p { font-size: 13px; }
+
+.results-content { display: none; }
+
+/* GAUGE */
+.gauge-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 20px 16px;
+  background: var(--bg);
+  border-radius: 10px;
+  margin-bottom: 20px;
+}
+.gauge-svg { width: 200px; height: 110px; }
+.gauge-score-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 4px;
+}
+
+/* TIER BADGE */
+.tier-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.tier-label-sm { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+.tier-badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 12px;
+  border-radius: 20px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tier-healthy  { background: var(--green-lt);  color: var(--green); }
+.tier-watch    { background: var(--amber-lt);  color: var(--amber); }
+.tier-risk     { background: var(--orange-lt); color: var(--orange); }
+.tier-critical { background: var(--red-lt);    color: var(--red); }
+
+/* SUMMARY */
+.summary-block {
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text);
+  border-left: 3px solid var(--slate);
+}
+
+/* ACTIONS */
+.actions-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.action-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+.action-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--slate);
+  background: var(--slate-lt);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* SCORE BREAKDOWN */
+.breakdown {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.breakdown-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.breakdown-bars { display: flex; flex-direction: column; gap: 8px; }
+.breakdown-row { display: flex; align-items: center; gap: 10px; }
+.breakdown-name { font-size: 12px; color: var(--text-muted); width: 130px; flex-shrink: 0; }
+.breakdown-bar-wrap { flex: 1; height: 6px; background: var(--surface); border-radius: 3px; overflow: hidden; }
+.breakdown-bar { height: 100%; border-radius: 3px; transition: width 0.8s cubic-bezier(.4,0,.2,1); }
+.breakdown-score { font-family: var(--mono); font-size: 11px; color: var(--text-muted); width: 32px; text-align: right; }
+
+/* FOOTER */
+.tool-footer {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.footer-attr {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+.footer-attr a { color: var(--slate); text-decoration: none; }
+.footer-attr a:hover { text-decoration: underline; }
+
+@media (max-width: 720px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .header { padding: 0 20px; }
+  .app { padding: 20px 16px 60px; }
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <img src="data:image/png;base64,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" alt="DE" class="header-logo">
+    <div class="header-divider"></div>
+    <span class="header-title">Customer Health Score Engine</span>
+  </div>
+  <span class="header-badge">v1.0 · AI-Powered</span>
+</header>
+
+<div class="app">
+  <div class="app-intro">
+    <h1>Customer Health Analysis</h1>
+    <p>Input account metrics to generate an AI-powered health assessment, risk tier, and recommended actions.</p>
+  </div>
+
+  <div class="main-grid">
+
+    <!-- INPUT PANEL -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Account Metrics</span>
+      </div>
+      <div class="panel-body">
+        <div class="metric-group">
+
+          <div class="metric-item" id="wrap-lastLogin">
+            <div class="metric-top">
+              <label class="metric-label" for="lastLogin">Days since last login</label>
+              <span class="metric-value" id="lastLoginVal">14</span>
+            </div>
+            <input type="range" id="lastLogin" min="0" max="90" value="14"
+              data-zone-fn="loginZone" data-val-id="lastLoginVal" data-val-suffix=""
+              oninput="sliderUpdate(this)">
+            <div class="metric-hint">0 = active today · 90+ = dormant</div>
+          </div>
+
+          <div class="metric-item" id="wrap-openTickets">
+            <div class="metric-top">
+              <label class="metric-label" for="openTickets">Open support tickets</label>
+              <span class="metric-value" id="openTicketsVal">2</span>
+            </div>
+            <input type="range" id="openTickets" min="0" max="15" value="2"
+              data-zone-fn="ticketsZone" data-val-id="openTicketsVal" data-val-suffix=""
+              oninput="sliderUpdate(this)">
+            <div class="metric-hint">Unresolved tickets across all channels</div>
+          </div>
+
+          <div class="metric-item" id="wrap-nps">
+            <div class="metric-top">
+              <label class="metric-label" for="nps">NPS score</label>
+              <span class="metric-value" id="npsVal">7</span>
+            </div>
+            <input type="range" id="nps" min="0" max="10" value="7"
+              data-zone-fn="npsZone" data-val-id="npsVal" data-val-suffix=""
+              oninput="sliderUpdate(this)">
+            <div class="metric-hint">0–6 detractor · 7–8 passive · 9–10 promoter</div>
+          </div>
+
+          <div class="metric-item" id="wrap-adoption">
+            <div class="metric-top">
+              <label class="metric-label" for="adoption">Feature adoption</label>
+              <span class="metric-value" id="adoptionVal">60%</span>
+            </div>
+            <input type="range" id="adoption" min="0" max="100" value="60"
+              data-zone-fn="adoptionZone" data-val-id="adoptionVal" data-val-suffix="%"
+              oninput="sliderUpdate(this)">
+            <div class="metric-hint">% of core features actively used</div>
+          </div>
+
+          <div class="metric-item" id="wrap-renewal">
+            <div class="metric-top">
+              <label class="metric-label" for="renewal">Days until renewal</label>
+              <span class="metric-value" id="renewalVal">120</span>
+            </div>
+            <input type="range" id="renewal" min="0" max="365" value="120"
+              data-zone-fn="renewalZone" data-val-id="renewalVal" data-val-suffix=""
+              oninput="sliderUpdate(this)">
+            <div class="metric-hint">0 = renewing now · 365 = just renewed</div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="metric-item" id="wrap-trend">
+            <div class="metric-top" style="margin-bottom:8px">
+              <label class="metric-label" for="trend">Engagement trend</label>
+            </div>
+            <select id="trend">
+              <option value="improving">Improving — usage and engagement increasing</option>
+              <option value="stable" selected>Stable — consistent but not growing</option>
+              <option value="declining">Declining — usage or logins dropping</option>
+            </select>
+          </div>
+
+          <div class="metric-item" id="wrap-segment">
+            <div class="metric-top" style="margin-bottom:8px">
+              <label class="metric-label" for="segment">Account segment</label>
+            </div>
+            <select id="segment">
+              <option value="enterprise">Enterprise (large org, complex needs, high ACV)</option>
+              <option value="mid-market" selected>Mid-Market (growing team, moderate complexity)</option>
+              <option value="smb">SMB (small team, high-volume, self-serve)</option>
+            </select>
+          </div>
+
+        </div>
+
+        <button class="btn-analyze" id="analyzeBtn" onclick="runAnalysis()">
+          <span id="btnText">Run Health Analysis</span>
+          <div class="spinner" id="btnSpinner"></div>
+        </button>
+      </div>
+    </div>
+
+    <!-- RESULTS PANEL -->
+    <div class="panel" id="resultsPanel">
+      <div class="panel-header">
+        <span class="panel-title">Health Assessment</span>
+        <span style="font-size:11px;color:var(--text-muted);font-family:var(--mono)" id="timestamp"></span>
+      </div>
+      <div class="panel-body">
+
+        <div class="results-empty" id="emptyState">
+          <div class="results-empty-icon">◎</div>
+          <p>Configure account metrics and run the analysis to generate a health assessment.</p>
+        </div>
+
+        <div class="results-content" id="resultsContent">
+
+          <!-- GAUGE -->
+          <div class="gauge-wrap">
+            <svg class="gauge-svg" viewBox="0 0 200 110" id="gaugeSvg">
+              <!-- Background arc -->
+              <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#E8EDF2" stroke-width="14" stroke-linecap="round"/>
+              <!-- Score arc -->
+              <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#5B8DB8" stroke-width="14"
+                stroke-linecap="round" stroke-dasharray="251.2" stroke-dashoffset="251.2"
+                id="gaugeArc" style="transition: stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1), stroke 0.5s"/>
+              <!-- Score text -->
+              <text x="100" y="88" text-anchor="middle" font-family="DM Mono, monospace"
+                font-size="32" font-weight="500" fill="#2A2A2A" id="gaugeNum">--</text>
+            </svg>
+            <div class="gauge-score-label">Overall Health Score</div>
+          </div>
+
+          <!-- TIER -->
+          <div class="tier-row">
+            <span class="tier-label-sm">Risk Tier</span>
+            <span class="tier-badge" id="tierBadge">--</span>
+          </div>
+
+          <!-- SUMMARY -->
+          <div class="summary-block" id="summaryText">
+            Generating analysis...
+          </div>
+
+          <!-- ACTIONS -->
+          <div class="actions-label">Recommended Actions</div>
+          <div class="action-list" id="actionList"></div>
+
+          <!-- BREAKDOWN -->
+          <div class="breakdown">
+            <div class="breakdown-title">Signal Breakdown</div>
+            <div class="breakdown-bars" id="breakdownBars"></div>
+          </div>
+
+          <!-- FOOTER -->
+          <div class="tool-footer">
+            <span class="footer-attr">Built by <a href="https://dustineiler.com" target="_blank">Dustin Eiler</a> · <a href="https://linkedin.com/in/dustin-eiler/" target="_blank">linkedin.com/in/dustin-eiler/</a></span>
+            <span class="footer-attr" style="color:var(--slate)">AI-Powered · Claude API</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── ZONE FUNCTIONS ─────────────────────────────────────────────
+// Each returns 'green' | 'yellow' | 'red'
+const zoneFns = {
+  loginZone:    v => v <= 10 ? 'green' : v <= 30 ? 'yellow' : 'red',
+  ticketsZone:  v => v <= 1  ? 'green' : v <= 3  ? 'yellow' : 'red',
+  npsZone:      v => v >= 9  ? 'green' : v >= 7  ? 'yellow' : 'red',
+  adoptionZone: v => v >= 80 ? 'green' : v >= 50 ? 'yellow' : 'red',
+  renewalZone:  v => v >= 300 ? 'green' : v >= 100 ? 'yellow' : 'red',
+};
+
+function applyZone(input, zone) {
+  const wrap = input.closest('.metric-item');
+  const valEl = document.getElementById(input.dataset.valId);
+  // Track classes
+  input.classList.remove('track-green','track-yellow','track-red');
+  input.classList.add('track-' + zone);
+  // Wrapper glow
+  wrap.classList.remove('zone-green','zone-yellow','zone-red');
+  wrap.classList.add('zone-' + zone);
+  // Value colour
+  if (valEl) {
+    valEl.classList.remove('val-green','val-yellow','val-red');
+    valEl.classList.add('val-' + zone);
+  }
+}
+
+function sliderUpdate(input) {
+  const val = parseInt(input.value);
+  const suffix = input.dataset.valSuffix || '';
+  const valEl = document.getElementById(input.dataset.valId);
+  if (valEl) valEl.textContent = val + suffix;
+  const fn = zoneFns[input.dataset.zoneFn];
+  if (fn) applyZone(input, fn(val));
+}
+
+// Initialise all zones — runs after DOM is parsed (script is bottom of body)
+function initZones() {
+  document.querySelectorAll('input[type=range][data-zone-fn]').forEach(input => {
+    sliderUpdate(input);
+  });
+}
+
+async function runAnalysis() {
+  const btn = document.getElementById('analyzeBtn');
+  const btnText = document.getElementById('btnText');
+  const spinner = document.getElementById('btnSpinner');
+
+  // Collect inputs
+  const metrics = {
+    lastLogin:   parseInt(document.getElementById('lastLogin').value),
+    openTickets: parseInt(document.getElementById('openTickets').value),
+    nps:         parseInt(document.getElementById('nps').value),
+    adoption:    parseInt(document.getElementById('adoption').value),
+    renewal:     parseInt(document.getElementById('renewal').value),
+    trend:       document.getElementById('trend').value,
+    segment:     document.getElementById('segment').value
+  };
+
+  // Loading state
+  btn.disabled = true;
+  btnText.textContent = 'Analyzing...';
+  spinner.style.display = 'block';
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('resultsContent').style.display = 'none';
+
+  const prompt = `You are a senior Customer Success analyst. Analyze the following account health metrics and return a JSON object only — no markdown, no explanation, just raw JSON.
+
+Account metrics:
+- Days since last login: ${metrics.lastLogin} (0=active today, 90+=dormant)
+- Open support tickets: ${metrics.openTickets}
+- NPS score: ${metrics.nps}/10 (0-6 detractor, 7-8 passive, 9-10 promoter)
+- Feature adoption: ${metrics.adoption}% of core features actively used
+- Days until contract renewal: ${metrics.renewal}
+- Engagement trend: ${metrics.trend}
+- Account segment: ${metrics.segment}
+
+Return this exact JSON structure:
+{
+  "score": <integer 0-100>,
+  "tier": <"Healthy" | "Needs Attention" | "At Risk" | "Critical">,
+  "summary": "<3-4 sentences of plain-English analyst commentary on the account's health, referencing specific signals. Be direct and specific.>",
+  "actions": [
+    "<specific recommended action 1>",
+    "<specific recommended action 2>",
+    "<specific recommended action 3>"
+  ],
+  "signals": {
+    "login_activity": <integer 0-100>,
+    "support_load": <integer 0-100>,
+    "nps_sentiment": <integer 0-100>,
+    "feature_adoption": <integer 0-100>,
+    "renewal_risk": <integer 0-100>
+  }
+}
+
+Score the individual signals as health indicators (100 = perfectly healthy signal, 0 = critical signal). Make the overall score a weighted composite. Be analytical and direct.`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+    const raw = data.content.map(b => b.text || '').join('');
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(clean);
+
+    renderResults(result, metrics);
+
+  } catch (err) {
+    console.error(err);
+    document.getElementById('emptyState').style.display = 'flex';
+    document.getElementById('emptyState').innerHTML = '<div class="results-empty-icon">!</div><p>Analysis failed. Check console for details.</p>';
+  } finally {
+    btn.disabled = false;
+    btnText.textContent = 'Run Health Analysis';
+    spinner.style.display = 'none';
+  }
+}
+
+function renderResults(result, metrics) {
+  // Timestamp
+  document.getElementById('timestamp').textContent =
+    new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+  // Gauge
+  const score = Math.max(0, Math.min(100, result.score));
+  const arcLen = 251.2;
+  const offset = arcLen - (score / 100) * arcLen;
+  const gaugeArc = document.getElementById('gaugeArc');
+  gaugeArc.style.strokeDashoffset = arcLen; // reset
+  gaugeArc.style.stroke = scoreColor(score);
+  setTimeout(() => { gaugeArc.style.strokeDashoffset = offset; }, 50);
+
+  // Animate number
+  let current = 0;
+  const target = score;
+  const step = Math.ceil(target / 40);
+  const numEl = document.getElementById('gaugeNum');
+  numEl.textContent = '0';
+  const counter = setInterval(() => {
+    current = Math.min(current + step, target);
+    numEl.textContent = current;
+    if (current >= target) clearInterval(counter);
+  }, 30);
+
+  // Tier badge
+  const tierEl = document.getElementById('tierBadge');
+  tierEl.textContent = result.tier;
+  tierEl.className = 'tier-badge ' + tierClass(result.tier);
+
+  // Summary
+  document.getElementById('summaryText').textContent = result.summary;
+
+  // Actions
+  const actionList = document.getElementById('actionList');
+  actionList.innerHTML = '';
+  (result.actions || []).forEach((action, i) => {
+    actionList.innerHTML += `
+      <div class="action-item">
+        <div class="action-num">${i+1}</div>
+        <div>${action}</div>
+      </div>`;
+  });
+
+  // Signal breakdown
+  const signals = result.signals || {};
+  const signalLabels = {
+    login_activity:  'Login activity',
+    support_load:    'Support load',
+    nps_sentiment:   'NPS sentiment',
+    feature_adoption:'Feature adoption',
+    renewal_risk:    'Renewal outlook'
+  };
+  const bars = document.getElementById('breakdownBars');
+  bars.innerHTML = '';
+  Object.entries(signals).forEach(([key, val]) => {
+    const pct = Math.max(0, Math.min(100, val));
+    bars.innerHTML += `
+      <div class="breakdown-row">
+        <span class="breakdown-name">${signalLabels[key] || key}</span>
+        <div class="breakdown-bar-wrap">
+          <div class="breakdown-bar" style="width:0%;background:${scoreColor(pct)}"
+            data-target="${pct}"></div>
+        </div>
+        <span class="breakdown-score">${pct}</span>
+      </div>`;
+  });
+
+  // Animate bars after render
+  setTimeout(() => {
+    document.querySelectorAll('.breakdown-bar').forEach(bar => {
+      bar.style.width = bar.dataset.target + '%';
+    });
+  }, 100);
+
+  // Show results
+  document.getElementById('resultsContent').style.display = 'block';
+}
+
+function scoreColor(score) {
+  if (score >= 75) return '#3A7D44';
+  if (score >= 50) return '#C07820';
+  if (score >= 30) return '#C05020';
+  return '#B02020';
+}
+
+function tierClass(tier) {
+  const map = {
+    'Healthy': 'tier-healthy',
+    'Needs Attention': 'tier-watch',
+    'At Risk': 'tier-risk',
+    'Critical': 'tier-critical'
+  };
+  return map[tier] || 'tier-watch';
+}
+
+// Init zones after all functions are defined
+initZones();
+</script>
+
+</body>
+</html>
